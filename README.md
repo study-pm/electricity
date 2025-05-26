@@ -47,6 +47,47 @@
 Конфигурирование Docker:
 - [Linux post-installation steps for Docker Engine](https://docs.docker.com/engine/install/linux-postinstall/)
 
+### 2.5 Установка кроссплатформенной среды для разработки клиентских приложений Node.js
+
+- [Download Node.js®](https://nodejs.org/en/download)
+
+Ваирант установки через NVM (Node Version Manager):
+```sh
+# Download and install nvm:
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+
+# in lieu of restarting the shell
+\. "$HOME/.nvm/nvm.sh"
+
+# Download and install Node.js:
+nvm install 22
+
+# Verify the Node.js version:
+node -v # Should print "v22.16.0".
+nvm current # Should print "v22.16.0".
+
+# Verify npm version:
+npm -v # Should print "10.9.2".
+```
+
+Вариант установки с использованием Docker:
+```sh
+# Docker has specific installation instructions for each operating system.
+# Please refer to the official documentation at https://docker.com/get-started/
+
+# Pull the Node.js Docker image:
+docker pull node:22-alpine
+
+# Create a Node.js container and start a Shell session:
+docker run -it --rm --entrypoint sh node:22-alpine
+
+# Verify the Node.js version:
+node -v # Should print "v22.16.0".
+
+# Verify npm version:
+npm -v # Should print "10.9.2".
+```
+
 ## 3 Разработка и настройка базового системного и сервисного ПО
 
 ### 3.1 Создание репозитория на GitHub и клонирование его локально
