@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Главная страница: список проектов
 app.get('/', async (req, res) => {
   const projects = await Project.findAll();
-  res.render('index', { projects });
+  res.render('index', { projects }); // projects — массив объектов проектов
 });
 
 // Детали проекта
