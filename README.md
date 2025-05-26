@@ -107,7 +107,7 @@ git clone git@study-pm.github.com:study-pm/electricity.git
 
     ```sh
     git add . # добавить все файлы в область отслеживания
-    git commit -m 'ignore db files'
+    git commit -m 'ignore db files' # фиксация изменений с сообщением
     ```
 
 4. Отправить изменения на удаленный сервер:
@@ -117,3 +117,19 @@ git clone git@study-pm.github.com:study-pm/electricity.git
     ```
 
 5. На удаленном сервере (https://github.com) создать новый запрос на принятие изменений (Pull Request), проверить выполненные изменения и сделать слияние ветки *setup-project* с главной веткой проекта (*main*).
+
+6. Удалить ветку *setup-project* в удаленном репозитории (кнопка *Delete Branch*).
+
+7. Переключиться в основную ветку и забрать слитые изменения из удаленного репозитория.
+
+    ```sh
+    git checkout main # переключение в главную ветку
+    git pull -p       # синхронизация с удаленным репозиторием
+    ```
+
+8. Удалить ветку *setup-project* локально:
+
+    ```sh
+    git branch -d setup-project # удаление ветки
+    git branch -a               # проверка (отображение всех веток)
+    ```
