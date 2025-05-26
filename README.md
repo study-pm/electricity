@@ -174,3 +174,802 @@ git clone git@study-pm.github.com:study-pm/electricity.git
     git branch -d setup-project # удаление ветки
     git branch -a               # проверка (отображение всех веток)
     ```
+
+## 4 Разработка структуры базы данных под управлением СУБД MySQL
+
+### 4.1 Описание сущностей
+
+База данных *OPK12A* содержит таблицы:
+
+- `Proekty` — проекты (id, номер, название)
+
+- `SmejnieOborudovaniya` — смежное оборудование (связано с проектами и типами оборудования)
+
+- `TipySmejnogoOborudovaniya` — типы оборудования
+
+- `Sklady` — склады (с расположением)
+
+- `Yacheiki` — ячейки на складах (связаны с оборудованием и складом)
+
+- `Zayavki` — заявки (с номером и датой)
+
+- `SostaviZayavok` — состав заявок (связь между ячейками и заявками)
+
+Данные таблицы и связи позволяют реализовать функционал отображения проектов, деталей проектов с оборудованием и складами, а также список заявок с их составом.
+
+### 4.2 Концептуальная, логическая, физическая схема БД
+
+### 4.3 Создание схемы БД и сценария заполнения данными
+
+1. Создать ветку для разработки структуры БД, переключиться в нее и связать с удаленной
+
+    ```sh
+    git checkout -b setup-db-scheme
+    git push -u origin setup-db-scheme
+    ```
+
+2. Скрипт по созданию БД разместить в папке */backup/Electric.sql*, добавить в область остлеживаемых файлов и зафиксировать это изменение.
+
+    ```sh
+    git add backup/
+    git commit -m 'add db schema and data backup'
+    ```
+
+3. Отправить изменения на удаленный сервер, сделать там слияние ветки с главной веткой проекта, переключиться в основную ветку, забрать изменения и удалить неактуальную ветку локально:
+
+    ```sh
+    git push                      # отправка изменений
+    git checkout main             # переключение в главную ветку
+    git pull -p                   # синхронизация с удаленным репозиторием
+    git branch -d setup-db-scheme # удаление ветки
+    ```
+
+## 5 Разработка функционала веб-сервера
+Для реализации backend части веб-сайта с использованием Node.js, Express и Sequelize на основе базы данных MySQL с приведённой схемой, необходимо выполнить несколько шагов. Основные моменты реализации:
+
+- Sequelize модели отражают структуру и связи базы данных.
+
+- Express маршруты получают данные из базы и передают их в EJS для рендеринга.
+
+- Следует использовать асинхронный код с async/await.
+
+- Реализовать основные страницы: проекты, детали проекта с оборудованием и складами, заявки.
+
+- Всё это можно запускать в Docker-контейнере с настройками из Docker Compose.
+
+Таким образом, backend будет полноценно обслуживать функционал, аналогичный исходным HTML-файлам, обеспечивая динамическую загрузку и отображение данных из MySQL с помощью Node.js, Express и Sequelize.
+
+### 5.1 Инициализация проекта и установка зависимостей
+
+1. Создать ветку для разработки бэкенда, переключиться в нее и связать с удаленной
+
+    ```sh
+    git checkout -b setup-backend
+    git push -u origin setup-backend
+    ```
+
+2. Инициализировать проект веб-сервера и установить необходимые зависимости:
+
+    ```sh
+    cd site     # переход в папку бэкенда
+    npm init -y # инициализация проекта с настройка по умолчанию
+    npm install express ejs sequelize mysql2 dotenv # установка зависимостей
+    ```
+
+    - `express` — веб-фреймворк для Node.js.
+
+    - `ejs` — шаблонизатор.
+
+    - `sequelize` — ORM для работы с MySQL.
+
+    - `mysql2` — драйвер MySQL.
+
+    - `dotenv` — для работы с переменными окружения.
+
+3. Добавить папку с библиотеками в список исключения:
+
+    ```sh
+    cd ../ # перейти в корневую папку проекта
+    echo  node_modules/ >> .gitignore # добавить в исключения
+    git add .gitignore # добавить файл для фиксации
+    git commit -m 'ignore libs' # зафиксировать изменения
+    ```
+
+4. Зафиксировать остальные изменения:
+
+    ```sh
+    git add site # добавить все остальные файлы
+    git commit -m 'install deps'
+    ```
+
+### 5.2 Настройка подключения к базе данных
+
+1. Создать каталог для конфигурационного файла:
+
+    ```sh
+    mkdir config
+    ```
+
+2. Создать конфигурационный файл:
+
+    ```sh
+    touch config/database.js
+    ```
+
+3. Открыть проект в VSCode:
+
+    ```sh
+    code -n .
+    ```
+
+4. Заполнить файл конфигурации следующим содержимым:
+
+    ```js
+    require('dotenv').config();
+    const { Sequelize } = require('sequelize');
+
+    const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
+    host: process.env.DB_HOST || 'localhost',
+    dialect: 'mysql',
+    logging: false,
+    define: {
+        timestamps: false, // в базе нет полей createdAt, updatedAt
+    },
+    });
+
+    module.exports = sequelize;
+    ```
+
+5. Создать файл с переменными окружения:
+
+    ```
+    touch .env
+    ```
+
+6. В *.env* указать параметры подключения:
+
+    ```js
+    DB_HOST=db
+    DB_USER=user
+    DB_PASSWORD=password
+    DB_NAME=OPK12A
+    ```
+
+4. Зафиксировать изменения:
+
+    ```sh
+    git add .env config/
+    git commit -m 'configure db connection'
+    ```
+
+### 5.3 Определение моделей данных
+Определить модели, соответствующие таблицам базы данных, с правильными связями:
+
+- `Project` (*Proekty*)
+
+- `Equipment` (*SmejnieOborudovaniya*)
+
+- `EquipmentType` (*TipySmejnogoOborudovaniya*)
+
+- `Warehouse` (*Sklady*)
+
+- `Cell` (*Yacheiki*)
+
+- `Request` (*Zayavki*)
+
+- `RequestItem` (*SostaviZayavok*)
+
+1. Создать папку *models/*
+
+    ```sh
+    mkdir models
+    ```
+
+2. В этой папке создать файлы моделей, соответствующие таблицам базы данных:
+
+    ```sh
+    cd models
+    touch Project.js Equipment.js EquipmentType.js Warehouse.js Cell.js Request.js RequestItem.js
+    ```
+
+3. В VSCode заполнить файлы моделей.
+
+    *Project.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+
+    const Project = sequelize.define('Proekty', {
+    idProekty: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+    },
+    NomerPr: {
+        type: DataTypes.STRING(45),
+        unique: true,
+        allowNull: false,
+    },
+    NazvaniePr: {
+        type: DataTypes.STRING(45),
+        unique: true,
+        allowNull: true,
+    },
+    }, {
+    tableName: 'Proekty',
+    });
+
+    module.exports = Project;
+    ```
+
+    *Equipment.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+    const Project = require('./Project');
+    const EquipmentType = require('./EquipmentType');
+
+    const Equipment = sequelize.define('SmejnieOborudovaniya', {
+    idSmejnieOborudovaniya: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    SeriinyNomerSmejObor: { type: DataTypes.STRING(45), unique: true, allowNull: false },
+    TemperaturaVozduhaSmejObor: DataTypes.INTEGER,
+    TemperaturaVodySmejObor: DataTypes.INTEGER,
+    TokiSmejObor: DataTypes.INTEGER,
+    NapryajenieSmejObor: DataTypes.INTEGER,
+    TipySmejnogoOborudovaniya_idTipySmejnogoOborudovaniya: { type: DataTypes.INTEGER, allowNull: false },
+    Proekty_idProekty: { type: DataTypes.INTEGER, allowNull: false },
+    }, {
+    tableName: 'SmejnieOborudovaniya',
+    });
+
+    Equipment.belongsTo(Project, { foreignKey: 'Proekty_idProekty' });
+    Equipment.belongsTo(EquipmentType, { foreignKey: 'TipySmejnogoOborudovaniya_idTipySmejnogoOborudovaniya' });
+
+    module.exports = Equipment;
+    ```
+
+    *EquipmentType.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+
+    const EquipmentType = sequelize.define('TipySmejnogoOborudovaniya', {
+    idTipySmejnogoOborudovaniya: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    NazvanieTipy: { type: DataTypes.STRING(45), unique: true, allowNull: false },
+    }, {
+    tableName: 'TipySmejnogoOborudovaniya',
+    });
+
+    module.exports = EquipmentType;
+    ```
+
+    *Warehouse.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+
+    const Warehouse = sequelize.define('Sklady', {
+    idSklady: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    Raspolojenie: { type: DataTypes.STRING(45), unique: true, allowNull: false },
+    }, {
+    tableName: 'Sklady',
+    });
+
+    module.exports = Warehouse;
+    ```
+
+    *Cell.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+    const Warehouse = require('./Warehouse');
+    const Equipment = require('./Equipment');
+
+    const Cell = sequelize.define('Yacheiki', {
+    idYacheiki: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    SeriinyNomerYacheikji: { type: DataTypes.STRING(45), unique: true, allowNull: false },
+    Stoimost: DataTypes.STRING(45),
+    Sklady_idSklady: { type: DataTypes.INTEGER, allowNull: false },
+    SmejnieOborudovaniya_idSmejnieOborudovaniya: { type: DataTypes.INTEGER, allowNull: false },
+    }, {
+    tableName: 'Yacheiki',
+    });
+
+    Cell.belongsTo(Warehouse, { foreignKey: 'Sklady_idSklady' });
+    Cell.belongsTo(Equipment, { foreignKey: 'SmejnieOborudovaniya_idSmejnieOborudovaniya' });
+
+    module.exports = Cell;
+    ```
+
+    *Request.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+
+    const Request = sequelize.define('Zayavki', {
+    idZayavki: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    NomerZayavki: { type: DataTypes.STRING(45), unique: true, allowNull: true },
+    DataZayavki: { type: DataTypes.DATEONLY, allowNull: true },
+    }, {
+    tableName: 'Zayavki',
+    });
+
+    module.exports = Request;
+    ```
+
+    *RequestItem.js*:
+    ```js
+    const { DataTypes } = require('sequelize');
+    const sequelize = require('../config/database');
+    const Cell = require('./Cell');
+    const Request = require('./Request');
+
+    const RequestItem = sequelize.define('SostaviZayavok', {
+    idSostaviZayavok: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    Yacheiki_idYacheiki: { type: DataTypes.INTEGER, allowNull: false },
+    Zayavki_idZayavki: { type: DataTypes.INTEGER, allowNull: false },
+    }, {
+    tableName: 'SostaviZayavok',
+    });
+
+    RequestItem.belongsTo(Cell, { foreignKey: 'Yacheiki_idYacheiki' });
+    RequestItem.belongsTo(Request, { foreignKey: 'Zayavki_idZayavki' });
+
+    module.exports = RequestItem;
+    ```
+
+4. Зафиксировать изменения:
+
+    ```sh
+    git add .
+    git commit -m 'define data models'
+    ```
+
+### 5.4 Определение связей между моделями
+
+1. Создать файл *index.js* в папке *models*
+
+    ```sh
+    touch index.js
+    ```
+
+2. В этом файле собираются все модели и определяются связи между ними:
+
+    ```js
+    const sequelize = require('../config/database');
+
+    const Project = require('./Project');
+    const Equipment = require('./Equipment');
+    const EquipmentType = require('./EquipmentType');
+    const Warehouse = require('./Warehouse');
+    const Cell = require('./Cell');
+    const Request = require('./Request');
+    const RequestItem = require('./RequestItem');
+
+    // Связи (если не заданы в моделях)
+    Project.hasMany(Equipment, { foreignKey: 'Proekty_idProekty' });
+    Equipment.belongsTo(Project, { foreignKey: 'Proekty_idProekty' });
+
+    Equipment.belongsTo(EquipmentType, { foreignKey: 'TipySmejnogoOborudovaniya_idTipySmejnogoOborudovaniya' });
+    EquipmentType.hasMany(Equipment, { foreignKey: 'TipySmejnogoOborudovaniya_idTipySmejnogoOborudovaniya' });
+
+    Warehouse.hasMany(Cell, { foreignKey: 'Sklady_idSklady' });
+    Cell.belongsTo(Warehouse, { foreignKey: 'Sklady_idSklady' });
+
+    Equipment.hasMany(Cell, { foreignKey: 'SmejnieOborudovaniya_idSmejnieOborudovaniya' });
+    Cell.belongsTo(Equipment, { foreignKey: 'SmejnieOborudovaniya_idSmejnieOborudovaniya' });
+
+    Request.hasMany(RequestItem, { foreignKey: 'Zayavki_idZayavki' });
+    RequestItem.belongsTo(Request, { foreignKey: 'Zayavki_idZayavki' });
+
+    Cell.hasMany(RequestItem, { foreignKey: 'Yacheiki_idYacheiki' });
+    RequestItem.belongsTo(Cell, { foreignKey: 'Yacheiki_idYacheiki' });
+
+    module.exports = {
+    sequelize,
+    Project,
+    Equipment,
+    EquipmentType,
+    Warehouse,
+    Cell,
+    Request,
+    RequestItem,
+    };
+    ```
+
+3. Зафиксировать изменения:
+
+    ```sh
+    git add .
+    git commit -m 'define object mapping'
+    ```
+
+### 5.5 Создание Express-приложения
+Необходимо создать приложение, запускающее сервер и выполняющее базовую маршрутизацию. Маршруты Express:
+
+- */projects* — список проектов (для главной страницы)
+
+- */projects/:id* — детали проекта с оборудованием и складами
+
+- */requests* — список заявок с количеством позиций и общей стоимостью
+
+В каждом маршруте получаются данные из базы через Sequelize и рендерятся EJS-шаблоны.
+
+1. Создать файл веб-приложения в папке *site*:
+
+    ```sh
+    cd ../
+    touch app.js
+    ```
+
+2. Открыть файл в VSCode и заполнить следующим содержимым:
+
+    ```js
+    require('dotenv').config();
+    const express = require('express');
+    const path = require('path');
+    const { sequelize, Project, Equipment, EquipmentType, Warehouse, Cell, Request, RequestItem } = require('./models');
+
+    const app = express();
+
+    app.set('view engine', 'ejs');
+    app.set('views', path.join(__dirname, 'views'));
+
+    app.use(express.static(path.join(__dirname, 'public')));
+
+    // Главная страница: список проектов
+    app.get('/', async (req, res) => {
+    const projects = await Project.findAll();
+    res.render('index', { projects }); // projects — массив объектов проектов
+    });
+
+    // Детали проекта
+    app.get('/projects/:id', async (req, res) => {
+    const projectId = req.params.id;
+
+    // Получаем проект
+    const project = await Project.findByPk(projectId);
+    if (!project) return res.status(404).send('Проект не найден');
+
+    // Получаем оборудование проекта с типом
+    const equipment = await Equipment.findAll({
+        where: { Proekty_idProekty: projectId },
+        include: [EquipmentType],
+    });
+
+    // Получаем склады и ячейки с оборудованием для проекта
+    const warehouses = await Warehouse.findAll({
+        include: {
+        model: Cell,
+        include: {
+            model: Equipment,
+            where: { Proekty_idProekty: projectId },
+            required: false,
+        },
+        },
+    });
+
+    res.render('project', { project, equipment, warehouses });
+    });
+
+    // Список заявок
+    app.get('/requests', async (req, res) => {
+    // Получаем заявки с количеством позиций и общей стоимостью
+    const requests = await Request.findAll({
+        include: {
+        model: RequestItem,
+        include: {
+            model: Cell,
+        },
+        },
+    });
+
+    // Подсчёт количества позиций и общей стоимости для каждой заявки
+    const requestsData = requests.map(req => {
+        const positionsCount = req.SostaviZayavoks.length;
+        const totalCost = req.SostaviZayavoks.reduce((sum, item) => {
+        const cost = parseFloat(item.Yacheiki.Stoimost) || 0;
+        return sum + cost;
+        }, 0);
+        return {
+        idZayavki: req.idZayavki,
+        NomerZayavki: req.NomerZayavki,
+        DataZayavki: req.DataZayavki,
+        positionsCount,
+        totalCost,
+        };
+    });
+
+    res.render('requests', { requests: requestsData });
+    });
+
+    // Запуск сервера и проверка подключения к БД
+    const PORT = process.env.PORT || 3000;
+    sequelize.authenticate()
+    .then(() => {
+        console.log('Подключение к базе данных успешно');
+        app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+    })
+    .catch(err => {
+        console.error('Ошибка подключения к базе данных:', err);
+    });
+    ```
+
+3. Зафиксировать изменения:
+
+    ```sh
+    git add .
+    git commit -m 'add backend application'
+    ```
+
+### 5.6 Отображение (рендеринг) и передача данных в EJS
+В маршрутах Express (в *app.js*) после получения данных из базы через Sequelize вызывается метод `res.render()`, который рендерит EJS-шаблон и передаёт в него объект с данными.
+
+- В *views/index.ejs* выводится список проектов с ссылками на детали.
+
+- В *views/project.ejs* выводится основная информацию о проекте, таблица оборудования и информация о складах и ячейках.
+
+- В *views/requests.ejs* выводится таблица заявок с их данными.
+
+Пример для главной страницы со списком проектов:
+```js
+app.get('/', async (req, res) => {
+  const projects = await Project.findAll();
+  res.render('index', { projects }); // projects — массив объектов проектов
+});
+```
+
+В шаблоне *views/index.ejs* можно обращаться к переменной `projects`.
+
+Ключевые особенности:
+- Данные из базы передаются в шаблон как объекты или массивы.
+
+- В EJS происходит динамическое построение HTML с учётом содержимого.
+
+- Это позволяет создавать страницы, аналогичные исходным HTML-файлам, но с динамическим наполнением из MySQL через Sequelize и Express.
+
+Основные приёмы работы с EJS
+- Вставка переменных: `<%= variable %>` — вывод с экранированием.
+
+- Логика: `<% if (...) { %> ... <% } %>`, циклы `<% array.forEach(...) { %> ... <% }) %>`.
+
+- Проверка наличия данных для вывода сообщений об отсутствии.
+
+- Вложенные циклы для сложных структур (например, склады → ячейки → оборудование).
+
+
+Таким образом реализуется динамическое отображение данных, полученных из базы, с помощью шаблонизатора EJS, что обеспечивает полноценный функционал сайта по управлению проектами, оборудованием и заявками. Алгоритм действий:
+
+1. Создать папку для хранения шаблонов:
+
+    ```sh
+    mkdir views
+    ```
+
+2. Создать файлы шаблонов:
+
+    ```sh
+    cd views
+    touch index.ejs project.ejs equests.ejs
+    ```
+
+3. Открыть и заполнить файлы шаблонов в VSCode.
+
+    *views/index.ejs — список проектов*:
+    ```js
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+    <meta charset="UTF-8" />
+    <title>Проекты</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    </head>
+    <body>
+    <header>
+        <h1>Проекты</h1>
+        <nav>
+        <a href="/">Проекты</a>
+        <a href="/requests">Заявки</a>
+        </nav>
+    </header>
+
+    <main>
+        <div id="projects-list" class="grid-container">
+        <% if (projects.length === 0) { %>
+            <p>Проекты не найдены.</p>
+        <% } else { %>
+            <% projects.forEach(project => { %>
+            <div class="project-item">
+                <h2><a href="/projects/<%= project.idProekty %>"><%= project.NazvaniePr %></a></h2>
+                <p>Номер проекта: <%= project.NomerPr %></p>
+            </div>
+            <% }) %>
+        <% } %>
+        </div>
+    </main>
+
+    <footer>
+        <p>Система управления проектами © 2024</p>
+    </footer>
+    </body>
+    </html>
+    ```
+
+    - Цикл `<% projects.forEach(...) %>` выводит каждый проект.
+
+    - Ссылка ведёт на страницу деталей проекта `/projects/:id`.
+
+    *views/project.ejs — детали проекта*:
+    ```js
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+    <meta charset="UTF-8" />
+    <title>Детали проекта: <%= project.NazvaniePr %></title>
+    <link rel="stylesheet" href="/css/style.css" />
+    </head>
+    <body>
+    <header>
+        <h1 id="project-title"><%= project.NazvaniePr %></h1>
+        <nav>
+        <a href="/">Назад к проектам</a>
+        <a href="/requests">Заявки</a>
+        </nav>
+    </header>
+
+    <main>
+        <section id="project-info">
+        <h2>Основная информация</h2>
+        <div class="info-grid">
+            <div>Номер проекта:</div>
+            <div><%= project.NomerPr %></div>
+            <div>Название:</div>
+            <div><%= project.NazvaniePr %></div>
+        </div>
+        </section>
+
+        <section id="equipment-section">
+        <h2>Оборудование</h2>
+        <table id="equipment-table">
+            <thead>
+            <tr>
+                <th>Тип</th>
+                <th>Серийный номер</th>
+                <th>Темп. воздуха</th>
+                <th>Темп. воды</th>
+                <th>Ток</th>
+                <th>Напряжение</th>
+            </tr>
+            </thead>
+            <tbody>
+            <% if (equipment.length === 0) { %>
+                <tr><td colspan="6">Оборудование не найдено</td></tr>
+            <% } else { %>
+                <% equipment.forEach(eq => { %>
+                <tr>
+                    <td><%= eq.TipySmejnogoOborudovaniya.NazvanieTipy %></td>
+                    <td><%= eq.SeriinyNomerSmejObor %></td>
+                    <td><%= eq.TemperaturaVozduhaSmejObor || '-' %></td>
+                    <td><%= eq.TemperaturaVodySmejObor || '-' %></td>
+                    <td><%= eq.TokiSmejObor || '-' %></td>
+                    <td><%= eq.NapryajenieSmejObor || '-' %></td>
+                </tr>
+                <% }) %>
+            <% } %>
+            </tbody>
+        </table>
+        </section>
+
+        <section id="warehouse-section">
+        <h2>Склады</h2>
+        <% if (warehouses.length === 0) { %>
+            <p>Склады не найдены.</p>
+        <% } else { %>
+            <% warehouses.forEach(warehouse => { %>
+            <div class="warehouse">
+                <h3><%= warehouse.Raspolojenie %></h3>
+                <% if (warehouse.Yacheikis.length === 0) { %>
+                <p>Ячейки отсутствуют</p>
+                <% } else { %>
+                <ul>
+                    <% warehouse.Yacheikis.forEach(cell => { %>
+                    <% if(cell.SmejnieOborudovaniya && cell.SmejnieOborudovaniya.Proekty_idProekty === project.idProekty) { %>
+                        <li>
+                        Ячейка: <%= cell.SeriinyNomerYacheikji %>, Стоимость: <%= cell.Stoimost || 'не указана' %>, Оборудование: <%= cell.SmejnieOborudovaniya.SeriinyNomerSmejObor %>
+                        </li>
+                    <% } %>
+                    <% }) %>
+                </ul>
+                <% } %>
+            </div>
+            <% }) %>
+        <% } %>
+        </section>
+    </main>
+
+    <footer>
+        <p>Система управления проектами © 2024</p>
+    </footer>
+    </body>
+    </html>
+    ```
+
+    - Используются вложенные циклы для вывода складов и ячеек.
+
+    - Проверяется наличие данных, чтобы избежать пустых таблиц.
+
+    *views/requests.ejs — список заявок*:
+    ```js
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+    <meta charset="UTF-8" />
+    <title>Заявки</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    </head>
+    <body>
+    <header>
+        <h1>Заявки</h1>
+        <nav>
+        <a href="/">Проекты</a>
+        <a href="/requests">Заявки</a>
+        </nav>
+    </header>
+
+    <main>
+        <table id="requests-table">
+        <thead>
+            <tr>
+            <th>Номер заявки</th>
+            <th>Дата</th>
+            <th>Количество позиций</th>
+            <th>Общая стоимость</th>
+            <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (requests.length === 0) { %>
+            <tr><td colspan="5">Заявки не найдены</td></tr>
+            <% } else { %>
+            <% requests.forEach(request => { %>
+                <tr>
+                <td><%= request.NomerZayavki || '-' %></td>
+                <td><%= request.DataZayavki ? request.DataZayavki.toISOString().slice(0,10) : '-' %></td>
+                <td><%= request.positionsCount %></td>
+                <td><%= request.totalCost.toFixed(2) %></td>
+                <td>
+                    <a href="/requests/<%= request.idZayavki %>">Просмотр</a>
+                </td>
+                </tr>
+            <% }) %>
+            <% } %>
+        </tbody>
+        </table>
+    </main>
+
+    <footer>
+        <p>Система управления проектами © 2024</p>
+    </footer>
+    </body>
+    </html>
+    ```
+
+    - Для даты используется форматирование в строку `YYYY-MM-DD`.
+
+    - Выводятся подсчитанные из контроллера количество позиций и общая стоимость.
+
+4. Зафиксировать изменения:
+
+    ```sh
+    git add .
+    git commit -m 'add view templates'
+    ```
+
+5. Отправить изменения на удаленный сервер, сделать там слияние ветки с главной веткой проекта, переключиться в основную ветку, забрать изменения и удалить неактуальную ветку локально:
+
+    ```sh
+    git push                      # отправка изменений
+    git checkout main             # переключение в главную ветку
+    git pull -p                   # синхронизация с удаленным репозиторием
+    git branch -d setup-db-scheme # удаление ветки
+    ```
