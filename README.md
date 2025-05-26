@@ -133,7 +133,6 @@ git clone git@study-pm.github.com:study-pm/electricity.git
 1. В каталоге проекта выполнить команды создания папок для бэкапов (резервных/архивных копий данных), базы данных и веб-сайта (бэкенда):
 
     ```sh
-    mkdir backup # папка для файлов резервного копирования
     mkdir db     # папка для файлов бд
     mkdir site   # папка для веб-сайта
     ```
@@ -141,14 +140,14 @@ git clone git@study-pm.github.com:study-pm/electricity.git
 2. Создать файл списка игнорируемых файлов (*.gitignore*):
 
     ```sh
-    echo /db/ > .gitignore # создает файл с записью, игнорирующей папку db
+    touch .gitignore
     ```
 
 3. Зафиксировать изменения:
 
     ```sh
     git add . # добавить все файлы в область отслеживания
-    git commit -m 'ignore db files' # фиксация изменений с сообщением
+    git commit -m 'add gitignore file' # фиксация изменений с сообщением
     ```
 
 4. Отправить изменения на удаленный сервер:
@@ -208,10 +207,10 @@ git clone git@study-pm.github.com:study-pm/electricity.git
     git push -u origin setup-db-scheme
     ```
 
-2. Скрипт по созданию БД разместить в папке */backup/Electric.sql*, добавить в область остлеживаемых файлов и зафиксировать это изменение.
+2. Скрипт по созданию БД разместить в папке */db/init.sql*, добавить в область отслеживаемых файлов и зафиксировать это изменение.
 
     ```sh
-    git add backup/
+    git add db/
     git commit -m 'add db schema and data backup'
     ```
 
@@ -789,7 +788,7 @@ app.get('/', async (req, res) => {
     </main>
 
     <footer>
-        <p>Система управления проектами © 2024</p>
+        <p>Система управления проектами © 2025</p>
     </footer>
     </body>
     </html>
@@ -888,7 +887,7 @@ app.get('/', async (req, res) => {
     </main>
 
     <footer>
-        <p>Система управления проектами © 2024</p>
+        <p>Система управления проектами © 2025</p>
     </footer>
     </body>
     </html>
@@ -948,7 +947,7 @@ app.get('/', async (req, res) => {
     </main>
 
     <footer>
-        <p>Система управления проектами © 2024</p>
+        <p>Система управления проектами © 2025</p>
     </footer>
     </body>
     </html>
@@ -971,5 +970,191 @@ app.get('/', async (req, res) => {
     git push                      # отправка изменений
     git checkout main             # переключение в главную ветку
     git pull -p                   # синхронизация с удаленным репозиторием
-    git branch -d setup-db-scheme # удаление ветки
+    git branch -d setup-backend   # удаление ветки
+    ```
+
+## 6 Разворачиваение компонентов
+Для развертывания приложения используется среда виртуализации Docker, причем для удобства оркестрации контейнерами задействуется Docker Compose с двумя сервисами: MySQL и Node.js приложением.
+
+### 6.1 Разворачивание БД
+Необходимо развернуть БД MySQL с данными из скрипта *db/init.sql* в Docker-контейнере, чтобы данные сохранялись в примонтированном томе (`db_data:/var/lib/mysql`), определённом в *docker-compose.yml*.
+
+Ключевые особенности:
+- Все данные и структура БД будут храниться в volume `db_data`.
+
+- При повторных перезапусках контейнера БД не будет теряться.
+
+- Для повторной инициализации нужно просто удалить volume.
+
+Таким образом, всё, что здесь нужно сделать — положить скрипт в папку, примонтировать его через *docker-compose.yml* в `/docker-entrypoint-initdb.d/,` и при первом запуске контейнера MySQL БД будет создана и заполнена, а все данные будут храниться в volume db_data. Если потребуется несколько файлов или дамп, то можно положить в папку *db/* несколько файлов, все они будут выполнены по алфавиту.
+
+1. Создать ветку для развертывания приложения, переключиться в нее и связать с удаленной
+
+    ```sh
+    git checkout -b app-deploy
+    git push -u origin app-deploy
+    ```
+
+2. Создать в корне проекта файл *docker-compose.yml*:
+
+    ```sh
+    touch docker-compose.yml
+    ```
+
+3. Открыть файл в VSCode и заполнить его следующим содержимым:
+
+    ```yaml
+    services:
+    db:
+        image: mysql:8
+        environment:
+        MYSQL_ROOT_PASSWORD: rootpassword
+        MYSQL_DATABASE: OPK12A
+        MYSQL_USER: user
+        MYSQL_PASSWORD: password
+        ports:
+        - "3306:3306"
+        volumes:
+        - ./db/data:/var/lib/mysql
+        - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    volumes:
+    db_data:
+    ```
+
+    Пояснения:
+
+    - `./db_data:/var/lib/mysql` — все данные БД будут храниться в локально в папке проекта (и, соответственно, будут доступны в пристыкованном к ней томе), даже после перезапуска контейнера.
+
+    - `./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro` — при первом запуске контейнера MySQL выполнит этот скрипт, создаст структуру и наполнит БД начальными данными.
+
+    Как работает инициализация:
+    - *init.sql* будет выполнен только при первом запуске, когда volume `db_data` ещё пустой.
+
+    - Если volume уже существует (БД уже была создана), скрипт повторно не выполнится.
+
+    - Если нужно пересоздать БД — удалить `volume` командой:
+
+        ```sh
+        docker compose down -v
+        ```
+
+    Это удалит volume и при следующем запуске БД инициализируется заново.
+
+
+4. Запуск контейнера с БД:
+
+    ```sh
+    docker compose up -d # Вариант 1
+    docker-compose up -d # Вариант 2
+    ```
+
+    Разница между `docker-compose` и `docker compose` заключается в их происхождении, реализации и интеграции с Docker CLI:
+
+    - `docker-compose` — это оригинальное автономное приложение, написанное на Python, для оркестрации многоконтейнерных приложений Docker. Оно использовалось долгое время как отдельный инструмент и устанавливалось отдельно от Docker. Команды выглядели как `docker-compose up`, `docker-compose down` и т.д.
+
+    - `docker compose` (с пробелом) — это более новая версия Docker Compose, переписанная на Go и интегрированная непосредственно в основной Docker CLI. Она является частью ветки Compose v2 и поставляется вместе с Docker (например, в Docker Desktop). Команды теперь вызываются через основной Docker CLI, например, `docker compose up`. Это обеспечивает единообразие флагов и опций с другими командами Docker, улучшенную поддержку и обновления
+
+    Таким образом, `docker compose` — это современный, более интегрированный и поддерживаемый инструмент, который заменяет `docker-compose`. Рекомендуется переходить на использование `docker compose` для новых проектов и обновлять скрипты, заменяя дефис на пробел в командах.
+
+    В результате выполнения команды Docker скачает все необходимые образы и запустит сервис. Консольный вывод:
+    ```
+    [+] Running 11/11
+    ✔ db Pulled                                                                                                                                                                                                                            13.9s 
+    ✔ c2eb5d06bfea Pull complete                                                                                                                                                                                                          2.8s 
+    ✔ 253ce0d09858 Pull complete                                                                                                                                                                                                          2.8s 
+    ✔ 80d03d2c4741 Pull complete                                                                                                                                                                                                          2.8s 
+    ✔ e4440634f2d6 Pull complete                                                                                                                                                                                                          3.0s 
+    ✔ 398e77186e87 Pull complete                                                                                                                                                                                                          3.0s 
+    ✔ ff3f8be14317 Pull complete                                                                                                                                                                                                          3.0s 
+    ✔ 7c52b30fb2be Pull complete                                                                                                                                                                                                          4.6s 
+    ✔ eb0fdd6a2898 Pull complete                                                                                                                                                                                                          4.6s 
+    ✔ 61a34481c5ea Pull complete                                                                                                                                                                                                         11.9s 
+    ✔ 41f706ab26e6 Pull complete                                                                                                                                                                                                         12.0s 
+    [+] Running 3/3
+    ✔ Network electricity_default   Created                                                                                                                                                                                                 0.2s 
+    ✔ Volume "electricity_db_data"  Created                                                                                                                                                                                                 0.0s 
+    ✔ Container electricity-db-1    Started    
+    ```
+
+5. Проверка правильности развертывания БД.
+
+    Выполняется проверка того, что БД развернулась и данные на месте (получить содержимое базы данных).
+
+    Через `docker compose` подключиться к MySQL и выполнить запросы:
+    ```sh
+    docker compose exec db mysql -uuser -ppassword -e "SHOW DATABASES;"
+    ```
+
+    Если контейнеры еще не успели полноценно развернуться, то можно получить следующую ошибку в консоли:
+    ```
+    ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (2)
+    ```
+
+    или такую:
+    ```
+    ERROR 1045 (28000): Access denied for user 'user'@'localhost' (using password: YES)
+    ```
+
+    В этом случае нужно немного подождать и повторить команду. В случае успеха должен быть следующий консольный вывод:
+    ```
+    mysql: [Warning] Using a password on the command line interface can be insecure.
+    +--------------------+
+    | Database           |
+    +--------------------+
+    | OPK12A             |
+    | information_schema |
+    | performance_schema |
+    +--------------------+
+    ```
+
+    Поскольку база инициализирована, то можно увидить среди баз данных *OPK12A*. 
+
+    Показать таблицы базы:
+    ```sh
+    docker compose exec db mysql -uuser -ppassword -e "USE OPK12A; SHOW TABLES;"
+    ```
+
+    Консольный вывод:
+    ```
+    mysql: [Warning] Using a password on the command line interface can be insecure.
+    +---------------------------+
+    | Tables_in_OPK12A          |
+    +---------------------------+
+    | Proekty                   |
+    | Sklady                    |
+    | SmejnieOborudovaniya      |
+    | SostaviZayavok            |
+    | TipySmejnogoOborudovaniya |
+    | Yacheiki                  |
+    | Zayavki                   |
+    +---------------------------+
+    ```
+
+    Показать данные (например, из таблицы проектов):
+    ```sh
+    docker compose exec db mysql -uuser -ppassword -e "USE OPK12A; SELECT * FROM Proekty;"
+    ```
+
+    Проверка логов контейнера:
+    ```sh
+    docker compose logs db
+    ```
+
+    Посмотр логов MySQL даст возможность  убедиться, что скрипт был выполнен без ошибок.
+
+4. Зафиксировать изменения:
+
+    ```sh
+    git add .
+    git commit -m 'add view templates'
+    ```
+
+5. Отправить изменения на удаленный сервер, сделать там слияние ветки с главной веткой проекта, переключиться в основную ветку, забрать изменения и удалить неактуальную ветку локально:
+
+    ```sh
+    git push                      # отправка изменений
+    git checkout main             # переключение в главную ветку
+    git pull -p                   # синхронизация с удаленным репозиторием
+    git branch -d setup-backend   # удаление ветки
     ```
