@@ -12,5 +12,23 @@ services:
       - ./db/data:/var/lib/mysql
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
+  app:
+    # build: .
+    build:
+      context: ./site
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: db
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: OPK12A
+    depends_on:
+      - db
+    # volumes:
+    #  - .:/app
+    volumes:
+      - ./site:/app
+
 volumes:
   db_data:
