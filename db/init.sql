@@ -11,7 +11,7 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- -----------------------------------------------------
 -- Schema OPK12A
 -- -----------------------------------------------------
-CREATE SCHEMA IF NOT EXISTS `OPK12A` DEFAULT CHARACTER SET utf8 ;
+CREATE SCHEMA IF NOT EXISTS `OPK12A` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `OPK12A` ;
 
 -- -----------------------------------------------------
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`Sklady` (
   `Raspolojenie` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`idSklady`),
   UNIQUE INDEX `Raspolojenie_UNIQUE` (`Raspolojenie` ASC) VISIBLE)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`TipySmejnogoOborudovaniya` (
   `NazvanieTipy` VARCHAR(45) NOT NULL,
   PRIMARY KEY (`idTipySmejnogoOborudovaniya`),
   UNIQUE INDEX `NazvanieTipy_UNIQUE` (`NazvanieTipy` ASC) VISIBLE)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`Proekty` (
   PRIMARY KEY (`idProekty`),
   UNIQUE INDEX `NomerPr_UNIQUE` (`NomerPr` ASC) VISIBLE,
   UNIQUE INDEX `NazvaniePr_UNIQUE` (`NazvaniePr` ASC) VISIBLE)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`SmejnieOborudovaniya` (
     REFERENCES `OPK12A`.`Proekty` (`idProekty`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`Yacheiki` (
     REFERENCES `OPK12A`.`SmejnieOborudovaniya` (`idSmejnieOborudovaniya`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`Zayavki` (
   `DataZayavki` DATE NULL,
   PRIMARY KEY (`idZayavki`),
   UNIQUE INDEX `NomerZayavki_UNIQUE` (`NomerZayavki` ASC) VISIBLE)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- -----------------------------------------------------
@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS `OPK12A`.`SostaviZayavok` (
     REFERENCES `OPK12A`.`Zayavki` (`idZayavki`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
-ENGINE = InnoDB;
+ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 SET SQL_MODE=@OLD_SQL_MODE;
