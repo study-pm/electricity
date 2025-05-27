@@ -750,7 +750,7 @@ app.get('/', async (req, res) => {
 
     ```sh
     cd views
-    touch index.ejs project.ejs equests.ejs
+    touch index.ejs project.ejs requests.ejs
     ```
 
 3. Открыть и заполнить файлы шаблонов в VSCode.
@@ -955,8 +955,6 @@ app.get('/', async (req, res) => {
 
     ```
 
-    - Для даты используется форматирование в строку `YYYY-MM-DD`.
-
     - Выводятся подсчитанные из контроллера количество позиций и общая стоимость.
 
 4. Зафиксировать изменения:
@@ -979,16 +977,16 @@ app.get('/', async (req, res) => {
 Для развертывания приложения используется среда виртуализации Docker, причем для удобства оркестрации контейнерами задействуется Docker Compose с двумя сервисами: MySQL и Node.js приложением.
 
 ### 6.1 Разворачивание БД
-Необходимо развернуть БД MySQL с данными из скрипта *db/init.sql* в Docker-контейнере, чтобы данные сохранялись в примонтированном томе (`db_data:/var/lib/mysql`), определённом в *docker-compose.yml*.
+Необходимо развернуть БД MySQL с данными из скрипта *db/init.sql* в Docker-контейнере, чтобы данные сохранялись в примонтированном томе (`/db/data:/var/lib/mysql`), определённом в *docker-compose.yml*.
 
 Ключевые особенности:
-- Все данные и структура БД будут храниться в volume `db_data`.
+- Все данные и структура БД будут храниться в volume `data`.
 
 - При повторных перезапусках контейнера БД не будет теряться.
 
 - Для повторной инициализации нужно просто удалить volume.
 
-Таким образом, всё, что здесь нужно сделать — положить скрипт в папку, примонтировать его через *docker-compose.yml* в `/docker-entrypoint-initdb.d/,` и при первом запуске контейнера MySQL БД будет создана и заполнена, а все данные будут храниться в volume db_data. Если потребуется несколько файлов или дамп, то можно положить в папку *db/* несколько файлов, все они будут выполнены по алфавиту.
+Таким образом, всё, что здесь нужно сделать — положить скрипт в папку, примонтировать его через *docker-compose.yml* в `/docker-entrypoint-initdb.d/,` и при первом запуске контейнера MySQL БД будет создана и заполнена, а все данные будут храниться в volume db/data. Если потребуется несколько файлов или дамп, то можно положить в папку *db/* несколько файлов, все они будут выполнены по алфавиту.
 
 1. Создать ветку для развертывания приложения, переключиться в нее и связать с удаленной
 
@@ -1007,21 +1005,21 @@ app.get('/', async (req, res) => {
 
     ```yaml
     services:
-    db:
-        image: mysql:8
-        environment:
-        MYSQL_ROOT_PASSWORD: rootpassword
-        MYSQL_DATABASE: OPK12A
-        MYSQL_USER: user
-        MYSQL_PASSWORD: password
-        ports:
-        - "3306:3306"
-        volumes:
-        - ./db/data:/var/lib/mysql
-        - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+        db:
+            image: mysql:8
+            environment:
+            MYSQL_ROOT_PASSWORD: rootpassword
+            MYSQL_DATABASE: OPK12A
+            MYSQL_USER: user
+            MYSQL_PASSWORD: password
+            ports:
+                - "3306:3306"
+            volumes:
+                - ./db/data:/var/lib/mysql
+                - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
     volumes:
-    db_data:
+        db_data:
     ```
 
     Пояснения:
