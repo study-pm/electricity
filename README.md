@@ -933,7 +933,7 @@ app.get('/', async (req, res) => {
             <% requests.forEach(request => { %>
                 <tr>
                 <td><%= request.NomerZayavki || '-' %></td>
-                <td><%= request.DataZayavki ? request.DataZayavki.toISOString().slice(0,10) : '-' %></td>
+                <td><%= request.DataZayavki || '-' %></td>
                 <td><%= request.positionsCount %></td>
                 <td><%= request.totalCost.toFixed(2) %></td>
                 <td>
@@ -947,10 +947,11 @@ app.get('/', async (req, res) => {
     </main>
 
     <footer>
-        <p>Система управления проектами © 2025</p>
+        <p>Система управления проектами © 2024</p>
     </footer>
     </body>
     </html>
+
     ```
 
     - Для даты используется форматирование в строку `YYYY-MM-DD`.
@@ -973,7 +974,7 @@ app.get('/', async (req, res) => {
     git branch -d setup-backend   # удаление ветки
     ```
 
-## 6 Разворачиваение компонентов
+## 6 Разворачивание компонентов
 Для развертывания приложения используется среда виртуализации Docker, причем для удобства оркестрации контейнерами задействуется Docker Compose с двумя сервисами: MySQL и Node.js приложением.
 
 ### 6.1 Разворачивание БД
@@ -1041,6 +1042,7 @@ app.get('/', async (req, res) => {
 
     Это удалит volume и при следующем запуске БД инициализируется заново.
 
+    Флаг `-v` в команде `docker compose down -v` означает, что вместе с остановкой и удалением контейнеров будут удалены также все тома (volumes), которые были созданы для этих контейнеров. Это позволяет полностью очистить все данные, связанные с сервисами, включая данные, сохранённые в томах. Иными словами, команда остановит и удалит контейнеры, сети и тома, определённые в *docker-compose.yml* файле. Без флага `-v` тома сохраняются, чтобы данные не потерялись при повторном запуске контейнеров. Следует использовать `-v`, если необходимо полностью удалить все связанные данные.
 
 4. Запуск контейнера с БД:
 
@@ -1136,6 +1138,20 @@ app.get('/', async (req, res) => {
     docker compose exec db mysql -uuser -ppassword -e "USE OPK12A; SELECT * FROM Proekty;"
     ```
 
+    Консольный вывод:
+    ```
+    +-----------+---------+----------------+
+    | idProekty | NomerPr | NazvaniePr     |
+    +-----------+---------+----------------+
+    |         1 | 52300   | Арктика |
+    |         2 | 53201   | Ермак     |
+    |         3 | 5543    | Ясень     |
+    |         4 | 5698-б | Бальзам |
+    |         5 | 2045    | Клубень |
+    |         6 | 21445   | Крюйс     |
+    +-----------+---------+----------------+
+    ```
+
     Проверка логов контейнера:
     ```sh
     docker compose logs db
@@ -1143,18 +1159,264 @@ app.get('/', async (req, res) => {
 
     Посмотр логов MySQL даст возможность  убедиться, что скрипт был выполнен без ошибок.
 
-4. Зафиксировать изменения:
+6. Файлы базы данных необходимо игнорировать:
 
     ```sh
-    git add .
-    git commit -m 'add view templates'
+    echo /db/data/ >> .gitignore
+    git add .gitignore && git commit -m 'ignore db files'
     ```
 
-5. Отправить изменения на удаленный сервер, сделать там слияние ветки с главной веткой проекта, переключиться в основную ветку, забрать изменения и удалить неактуальную ветку локально:
+7. Зафиксировать изменения:
+
+    ```sh
+    git add . && git commit -m 'setup db service'
+    ```
+
+### 6.2 Разворачивание веб-приложения
+Необходимо упаковать Node.js-приложение в единый контейнер, который можно запустить на любом сервере, где есть Docker. Для этого необходимо создать Dockerfile, который описывает всё, что нужно для работы приложения (код, зависимости, настройки). Docker сам скачает Node.js, установит зависимости и подготовит среду. *Dockerfile* позволяет запускать приложение как сервис в `docker compose.yml` — вместе с базой данных и другими сервисами. Контейнер работает изолированно от основной системы. Всё, что делает приложение, не влияет на хостовую ОС и наоборот.
+
+1. Создать в корне проекта файл *Dockerfile*:
+
+    ```sh
+    touch Dockerfile
+    ```
+
+2. Открыть файл в VSCode и заполнить его следующим содержимым:
+
+    ```dockerfile
+    FROM node:18-alpine
+    # Базовый образ: минимальная версия Linux с Node.js 18.
+    # Это экономит место и ускоряет загрузку.
+
+    WORKDIR /app
+    # Рабочая директория внутри контейнера. Все дальнейшие команды будут выполняться здесь.
+
+    COPY site/package*.json ./
+    # Копируются файлы зависимостей (package.json и package-lock.json).
+
+    RUN npm install
+    # Устанавливаются все npm-зависимости.
+
+    COPY site/. .
+    # Копируется весь исходный код приложения внутрь контейнера.
+
+    EXPOSE 3000
+    # Оповещает Docker, что приложение слушает порт 3000 (стандарт для Express).
+
+    CMD ["node", "app.js"]
+    # Запускает приложение командой node app.js при старте контейнера.
+    ```
+
+    В данном файле учтено, что основной код лежит в подкаталоге, а не в корне (*Dockerfile* копирует файлы из папки *site*).
+
+3. Открыть файл *docker-compose.yml* в VSCode и добавить сервис веб-приложения на бэкенде:
+
+    ```yml
+    services:
+    db:
+        image: mysql:8
+        environment:
+        MYSQL_ROOT_PASSWORD: rootpassword
+        MYSQL_DATABASE: OPK12A
+        MYSQL_USER: user
+        MYSQL_PASSWORD: password
+        ports:
+        - "3306:3306"
+        volumes:
+        - ./db/data:/var/lib/mysql
+        - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+
+    app:
+        build:
+        context: ./site
+        ports:
+        - "3000:3000"
+        environment:
+        DB_HOST: db
+        DB_USER: user
+        DB_PASSWORD: password
+        DB_NAME: OPK12A
+        depends_on:
+        - db
+        volumes:
+        - ./site:/app
+
+    volumes:
+    db_data:
+
+    ```
+
+    Здесь учитывается контекст сборки: теперь это папка *site*, а не корень проекта. Особенности:
+
+    - Если используется volume `./site:/app`, то при запуске контейнера содержимое папки *site* будет доступно внутри контейнера по пути */app*, и запуск `node app.js` будет работать.
+
+    - Если используются оба метода (и копирование в *Dockerfile*, и volume), то volume "перекроет" то, что было скопировано на этапе сборки.
+
+
+4. Запустить проект:
+
+    ```sh
+    docker compose up -d
+    ```
+
+5. Запустить веб-обозреватель и проследователь по адресу http://localhost:3000/. Должна открыться главная страница проекта.
+
+6. Зафиксировать изменения:
+
+    ```sh
+    git add . && git commit -m 'setup web app service'
+    ```
+
+7. Отправить изменения на удаленный сервер, сделать там слияние ветки с главной веткой проекта, переключиться в основную ветку, забрать изменения и удалить неактуальную ветку локально:
 
     ```sh
     git push                      # отправка изменений
     git checkout main             # переключение в главную ветку
     git pull -p                   # синхронизация с удаленным репозиторием
-    git branch -d setup-backend   # удаление ветки
+    git branch -d app-deploy      # удаление ветки
+    ```
+
+## Тестирование и отладка
+При попытке запуске проекта можно столкнуться с различными ошибками. Например, по какой-либо причине тот или иной контейнер может быть аварийно остановлен. Наличие работающих контейнерв можно проверить командой `docker ps`:
+
+```sh
+docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                                                  NAMES
+a7d10b393d7e   mysql:8   "docker-entrypoint.s…"   4 seconds ago   Up 4 seconds   0.0.0.0:3306->3306/tcp, :::3306->3306/tcp, 33060/tcp   electricity-db-1
+```
+
+В данном случае отсутствует контейнер веб-приложения. Если проверить все контейнеры, то можно убедиться в том, что он преждевременно завершил свою работу:
+```sh
+docker ps -a
+CONTAINER ID   IMAGE             COMMAND                  CREATED              STATUS                          PORTS                                                  NAMES
+d737f255446f   electricity-app   "docker-entrypoint.s…"   About a minute ago   Exited (0) About a minute ago                                                          electricity-app-1
+a7d10b393d7e   mysql:8           "docker-entrypoint.s…"   About a minute ago   Up About a minute               0.0.0.0:3306->3306/tcp, :::3306->3306/tcp, 33060/tcp   electricity-db-1
+```
+
+Можно проверить логи контейнера:
+```
+docker compose logs app
+app-1  | Ошибка подключения к базе данных: ConnectionRefusedError [SequelizeConnectionRefusedError]: connect ECONNREFUSED 172.18.0.2:3306
+app-1  |     at ConnectionManager.connect (/app/node_modules/sequelize/lib/dialects/mysql/connection-manager.js:92:17)
+app-1  |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+app-1  |     at async ConnectionManager._connect (/app/node_modules/sequelize/lib/dialects/abstract/connection-manager.js:222:24)
+app-1  |     at async /app/node_modules/sequelize/lib/dialects/abstract/connection-manager.js:174:32
+app-1  |     at async ConnectionManager.getConnection (/app/node_modules/sequelize/lib/dialects/abstract/connection-manager.js:197:7)
+app-1  |     at async /app/node_modules/sequelize/lib/sequelize.js:305:26
+app-1  |     at async Sequelize.authenticate (/app/node_modules/sequelize/lib/sequelize.js:457:5) {
+app-1  |   parent: Error: connect ECONNREFUSED 172.18.0.2:3306
+app-1  |       at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16) {
+app-1  |     errno: -111,
+app-1  |     code: 'ECONNREFUSED',
+app-1  |     syscall: 'connect',
+app-1  |     address: '172.18.0.2',
+app-1  |     port: 3306,
+app-1  |     fatal: true
+app-1  |   },
+app-1  |   original: Error: connect ECONNREFUSED 172.18.0.2:3306
+app-1  |       at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1555:16) {
+app-1  |     errno: -111,
+app-1  |     code: 'ECONNREFUSED',
+app-1  |     syscall: 'connect',
+app-1  |     address: '172.18.0.2',
+app-1  |     port: 3306,
+app-1  |     fatal: true
+app-1  |   }
+app-1  | }
+```
+
+Обращает на себя внимание следующая проблема:
+```
+Ошибка подключения к базе данных: ConnectionRefusedError [SequelizeConnectionRefusedError]: connect ECONNREFUSED 172.18.0.2:3306
+```
+
+Дале излагается алгоритм проверки и отладки с изложением причин и предлагаемых решений.
+
+1. MySQL ещё не успел запуститься. Это самая частая причина. Контейнер с приложением стартует раньше, чем база данных готова принимать подключения. Решения:
+
+    - Убедиться, что в коде Node.js есть повторные попытки подключения (retry) или задержка перед первым запросом.
+
+    - Можно добавить небольшую задержку старта приложения (например, через npm-пакет wait-port или wait-for-it.sh).
+
+    - В `docker compose` `depends_on` НЕ гарантирует, что база уже готова, он только запускает контейнеры в нужном порядке.
+
+2. Проверить логи MySQL. Посмотреть, нет ли ошибок инициализации базы, например:
+
+    ```sh
+    docker compose logs db
+    ```
+
+    Если есть ошибки (например, из-за скрипта инициализации), MySQL может не стартовать. Необходимо исправить указанные ошибки.
+
+3. Проверить порт и имя хоста. В `docker compose` для Node.js приложения должно быть:
+
+    ```js
+    environment:
+    DB_HOST: db
+    DB_USER: user
+    DB_PASSWORD: password
+    DB_NAME: OPK12A
+    ```
+
+    где db — имя сервиса MySQL в `docker compose`.
+
+    В Sequelize-конфигураторе необходимо использовать эти переменные.
+
+4. Проверить что база MySQL реально слушает порт 3306:
+
+    ```sh
+    docker compose exec db netstat -ln | grep 3306
+    ```
+
+5. Проверить, что база инициализирована корректно
+
+    Если только что создан volume с данными, и инициализационный скрипт был некорректен, база может не стартовать.
+
+6. Перезапустить сервисы:
+
+    ```sh
+    docker compose down
+    docker compose up -d
+    ```
+
+7. Если всё хорошо, но ошибка повторяется, то следует добавить retry-подключение в код Node.js.
+
+    Retry должен быть только там, где происходит инициализация подключения к БД, то есть при вызове `sequelize.authenticate()` или при создании самого экземпляра Sequelize. Легче всего добавить функцию переподключения в конец главного файл веб-приложения *app.js* и изменить метод запуска сервера:
+    ```js
+    ...
+    // Функция для повторных попыток подключения к БД
+    async function connectWithRetry(retries = 10, delay = 3000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+        await sequelize.authenticate();
+        console.log('Подключение к базе данных успешно');
+        return;
+        } catch (err) {
+        console.error(`Ошибка подключения к базе данных (попытка ${i + 1}):`, err.message);
+        if (i < retries - 1) {
+            await new Promise(res => setTimeout(res, delay));
+        } else {
+            throw err;
+        }
+        }
+    }
+    }
+
+    // Запуск сервера только после успешного подключения к БД
+    const PORT = process.env.PORT || 3000;
+    connectWithRetry()
+    .then(() => {
+        app.listen(PORT, () => console.log(`Сервер запущен на порту ${PORT}`));
+    })
+    .catch(err => {
+        console.error('Не удалось подключиться к базе данных. Завершение работы.');
+        process.exit(1);
+    });
+    ```
+
+8. Перезапустить сервисы:
+
+    ```sh
+    docker compose down
+    docker compose up -d
     ```
