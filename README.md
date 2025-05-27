@@ -286,13 +286,13 @@ git clone git@study-pm.github.com:study-pm/electricity.git
 1. Создать каталог для конфигурационного файла:
 
     ```sh
-    mkdir config
+    mkdir site/config
     ```
 
 2. Создать конфигурационный файл:
 
     ```sh
-    touch config/database.js
+    touch site/config/database.js
     ```
 
 3. Открыть проект в VSCode:
@@ -322,6 +322,7 @@ git clone git@study-pm.github.com:study-pm/electricity.git
 5. Создать файл с переменными окружения:
 
     ```
+    cd site
     touch .env
     ```
 
