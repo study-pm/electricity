@@ -1008,10 +1008,10 @@ app.get('/', async (req, res) => {
         db:
             image: mysql:8
             environment:
-            MYSQL_ROOT_PASSWORD: rootpassword
-            MYSQL_DATABASE: OPK12A
-            MYSQL_USER: user
-            MYSQL_PASSWORD: password
+                MYSQL_ROOT_PASSWORD: rootpassword
+                MYSQL_DATABASE: OPK12A
+                MYSQL_USER: user
+                MYSQL_PASSWORD: password
             ports:
                 - "3306:3306"
             volumes:
@@ -1215,33 +1215,33 @@ app.get('/', async (req, res) => {
     db:
         image: mysql:8
         environment:
-        MYSQL_ROOT_PASSWORD: rootpassword
-        MYSQL_DATABASE: OPK12A
-        MYSQL_USER: user
-        MYSQL_PASSWORD: password
+            MYSQL_ROOT_PASSWORD: rootpassword
+            MYSQL_DATABASE: OPK12A
+            MYSQL_USER: user
+            MYSQL_PASSWORD: password
         ports:
-        - "3306:3306"
+            - "3306:3306"
         volumes:
-        - ./db/data:/var/lib/mysql
-        - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+            - ./db/data:/var/lib/mysql
+            - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
 
     app:
         build:
-        context: ./site
+            context: ./site
         ports:
-        - "3000:3000"
+            - "3000:3000"
         environment:
-        DB_HOST: db
-        DB_USER: user
-        DB_PASSWORD: password
-        DB_NAME: OPK12A
+            DB_HOST: db
+            DB_USER: user
+            DB_PASSWORD: password
+            DB_NAME: OPK12A
         depends_on:
-        - db
+            - db
         volumes:
-        - ./site:/app
+            - ./site:/app
 
     volumes:
-    db_data:
+        db_data:
 
     ```
 
