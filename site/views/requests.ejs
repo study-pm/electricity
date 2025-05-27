@@ -32,7 +32,7 @@
           <% requests.forEach(request => { %>
             <tr>
               <td><%= request.NomerZayavki || '-' %></td>
-              <td><%= request.DataZayavki ? request.DataZayavki.toISOString().slice(0,10) : '-' %></td>
+              <td><%= request.DataZayavki || '-' %></td>
               <td><%= request.positionsCount %></td>
               <td><%= request.totalCost.toFixed(2) %></td>
               <td>
